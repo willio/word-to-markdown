@@ -1,0 +1,5 @@
+/vendor/
+/.phpunit.result.cache
+/converted/
+*.log
+.DS_Store

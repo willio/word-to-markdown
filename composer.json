@@ -1,0 +1,30 @@
+{
+    "name": "willio/word-to-markdown",
+    "description": "Convert legacy Word documents into clean Markdown with recovered metadata and safe links.",
+    "type": "library",
+    "license": "GPL-3.0-only",
+    "require": {
+        "php": "^8.1",
+        "ext-dom": "*",
+        "ext-zip": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "WordToMarkdown\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "WordToMarkdown\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
