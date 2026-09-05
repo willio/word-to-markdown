@@ -1,0 +1,83 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+$root = dirname(__DIR__);
+$autoload = $root . '/vendor/autoload.php';
+if (is_file($autoload)) {
+    require $autoload;
+} else {
+    spl_autoload_register(static function (string $class) use ($root): void {
+        $prefix = 'WordToMarkdown\\';
+        if (!str_starts_with($class, $prefix)) {
+            return;
+        }
+        $file = $root . '/src/' . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
+        if (is_file($file)) {
+            require $file;
+        }
+    });
+}
+
+use WordToMarkdown\DirectoryDocumentImporter;
+use WordToMarkdown\DocxDocumentParser;
+use WordToMarkdown\LegacyDocConverter;
+use WordToMarkdown\LegacyDocumentImporter;
+use WordToMarkdown\MarkdownDocumentWriter;
+
+$arguments = array_slice($argv, 1);
+$source = array_shift($arguments);
+if (!is_string($source) || $source === '' || in_array($source, ['-h', '--help'], true)) {
+    fwrite(STDERR, "Usage: word-to-markdown SOURCE [--output=DIR] [--author=NAME] [--recursive] [--dry-run]\n");
+    exit($source === '--help' || $source === '-h' ? 0 : 2);
+}
+
+$output = 'converted';
+$author = null;
+$recursive = false;
+$dryRun = false;
+foreach ($arguments as $argument) {
+    if ($argument === '--recursive') {
+        $recursive = true;
+    } elseif ($argument === '--dry-run') {
+        $dryRun = true;
+    } elseif (str_starts_with($argument, '--output=')) {
+        $output = substr($argument, strlen('--output='));
+    } elseif (str_starts_with($argument, '--author=')) {
+        $author = substr($argument, strlen('--author='));
+    } else {
+        fwrite(STDERR, "Unknown option: {$argument}\n");
+        exit(2);
+    }
+}
+
+try {
+    $writer = new MarkdownDocumentWriter($root . DIRECTORY_SEPARATOR . $output);
+    $importer = new LegacyDocumentImporter(
+        new DocxDocumentParser(),
+        $writer,
+        new LegacyDocConverter(sys_get_temp_dir() . '/word-to-markdown'),
+    );
+
+    if (is_dir($source)) {
+        $summary = (new DirectoryDocumentImporter($importer))->import($source, $author, $dryRun, $recursive);
+        foreach ($summary['results'] as $result) {
+            $status = strtoupper($result['status']);
+            $message = $result['error'] ?? $result['path'] ?? '';
+            printf("%s %s%s\n", $status, $result['source'], $message !== '' ? " — {$message}" : '');
+        }
+        printf("Imported: %d | Previewed: %d | Failed: %d\n", $summary['imported'], $summary['previewed'], $summary['failed']);
+        exit($summary['failed'] === 0 ? 0 : 1);
+    }
+
+    $result = $importer->import($source, $author, $dryRun);
+    if ($dryRun) {
+        echo $result['content'];
+    } else {
+        printf("Converted %s → %s\n", $source, $result['path']);
+    }
+} catch (Throwable $error) {
+    fwrite(STDERR, $error->getMessage() . "\n");
+    exit(1);
+}
